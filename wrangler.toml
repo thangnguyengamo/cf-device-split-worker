@@ -1,0 +1,4 @@
+name = "my-worker"
+type = "javascript"
+main = "index.js"
+compatibility_date = "2025-04-25"
