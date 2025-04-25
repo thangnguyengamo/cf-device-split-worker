@@ -3,20 +3,19 @@ export default {
     const ua = request.headers.get("User-Agent") || "";
     const url = new URL(request.url);
 
-    // Gắn dấu hiệu phân biệt thiết bị
+    // Phân biệt thiết bị
     const device = /Mobile|Android|iPhone|iPad/i.test(ua) ? "mobile" : "desktop";
     url.searchParams.set("_cf_device", device);
 
+    // Tạo cache key mới dựa trên URL mới
     const modifiedRequest = new Request(url.toString(), request);
-
-    // Xử lý cache
     const cache = caches.default;
-    const cacheKey = new Request(modifiedRequest.url, modifiedRequest);
 
-    let response = await cache.match(cacheKey);
+    let response = await cache.match(modifiedRequest);
     if (!response) {
       response = await fetch(modifiedRequest);
 
+      // Xóa Vary header nếu có
       const newHeaders = new Headers(response.headers);
       newHeaders.delete("Vary");
 
@@ -25,7 +24,7 @@ export default {
         headers: newHeaders
       });
 
-      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+      ctx.waitUntil(cache.put(modifiedRequest, response.clone()));
     }
 
     return response;
