@@ -1,46 +1,20 @@
 export default {
   async fetch(request, env, ctx) {
-    const ua = request.headers.get("User-Agent") || "";
-    const url = new URL(request.url);
-
-    const device = /Mobile|Android|iPhone|iPad/i.test(ua) ? "mobile" : "desktop";
-
-    const cacheKeyHeaders = new Headers(request.headers);
-    cacheKeyHeaders.set("CF-Device", device);
-    const customCacheKey = new Request(url.toString(), {
-      method: request.method,
-      headers: cacheKeyHeaders,
-      body: request.body,
-      redirect: request.redirect
-    });
-
     const cache = caches.default;
-    let response = await cache.match(customCacheKey);
 
+    // Thử lấy response từ cache Cloudflare
+    let response = await cache.match(request);
     if (!response) {
+      // Nếu chưa có cache, fetch từ origin server
       response = await fetch(request);
 
-      const newHeaders = new Headers(response.headers);
-      newHeaders.delete("Vary"); // xóa header Vary để tránh cache phân mảnh
+      // Giữ nguyên tất cả header, không xóa Vary
 
-      response = new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders
-      });
-
-      ctx.waitUntil(cache.put(customCacheKey, response.clone()));
-    } else {
-      // Khi lấy cache trả về client, cũng xóa header Vary
-      const newHeaders = new Headers(response.headers);
-      newHeaders.delete("Vary");
-      response = new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders
-      });
+      // Lưu response vào cache Cloudflare (bất đồng bộ)
+      ctx.waitUntil(cache.put(request, response.clone()));
     }
 
+    // Trả về response (cache hoặc origin)
     return response;
   }
 }
